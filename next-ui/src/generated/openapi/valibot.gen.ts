@@ -97,6 +97,16 @@ export const vCollectionUpdateDto = v.object({
     seriesIds: v.optional(v.array(v.string()))
 });
 
+export const vContentSnippetDto = v.object({
+    chapter: v.optional(v.string()),
+    highlight: v.string(),
+    href: v.string(),
+    matchCount: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647')),
+    occurrence: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647')),
+    progression: v.number(),
+    text: v.string()
+});
+
 export const vDirectoryRequestDto = v.object({
     path: v.string(),
     showFiles: v.boolean()
@@ -949,7 +959,8 @@ export const vBookMetadataDto = v.object({
 });
 
 export const vBookDto = v.object({
-    contentSnippets: v.optional(v.array(v.string())),
+    contentMatchCount: v.optional(v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647'))),
+    contentSnippets: v.optional(v.array(vContentSnippetDto)),
     created: v.pipe(v.string(), v.isoTimestamp(), v.transform((val: string): Date => new Date(val))),
     deleted: v.boolean(),
     fileHash: v.string(),
@@ -1569,6 +1580,19 @@ export const vGetBookByIdResponse = vBookDto;
 export const vBookAnalyzePath = v.object({
     bookId: v.string()
 });
+
+export const vGetBookContentSnippetsPath = v.object({
+    bookId: v.string()
+});
+
+export const vGetBookContentSnippetsQuery = v.object({
+    search: v.string()
+});
+
+/**
+ * OK
+ */
+export const vGetBookContentSnippetsResponse = v.array(vContentSnippetDto);
 
 export const vDeleteBookFilePath = v.object({
     bookId: v.string()

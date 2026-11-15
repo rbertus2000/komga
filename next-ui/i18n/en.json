@@ -351,10 +351,6 @@
     "defaultMessage": "On deck — {number}",
     "description": "Series view: book on deck"
   },
-  "4jihJ/": {
-    "defaultMessage": "Search by title, ISBN, or the text inside EPUB books",
-    "description": "Search page: empty state text when there is no search term"
-  },
   "4uqafX": {
     "defaultMessage": "One-shot",
     "description": "Filter: one-shot"
@@ -455,6 +451,10 @@
     "defaultMessage": "Book",
     "description": "Import reading list table header: Book"
   },
+  "7F5R1f": {
+    "defaultMessage": "Series",
+    "description": "Search page: series results header"
+  },
   "7M1pUf": {
     "defaultMessage": "Empty trash",
     "description": "Library empty trash dialog: confirm button"
@@ -538,10 +538,6 @@
   "8kylzj": {
     "defaultMessage": "Delete",
     "description": "Multiple entities deletion dialog: confirm button"
-  },
-  "8mG82T": {
-    "defaultMessage": "Search books",
-    "description": "Search page: empty state title when there is no search term"
   },
   "8xonXJ": {
     "defaultMessage": "Analyzes all the media files in the library. The analysis captures information about the media. Depending on your library size, this may take a long time.",
@@ -863,6 +859,10 @@
     "defaultMessage": "Visual",
     "description": "Book Compare: Visual"
   },
+  "ExNWqK": {
+    "defaultMessage": "Search",
+    "description": "Search page: empty state title when there is no search term"
+  },
   "EzOmuX": {
     "defaultMessage": "Created",
     "description": "Known Duplicate Page Table header: creation date"
@@ -1139,6 +1139,10 @@
     "defaultMessage": "Book",
     "description": "Import books table header: book"
   },
+  "KqUlfl": {
+    "defaultMessage": "Show fewer matches",
+    "description": "Search page: button to show only the best content matches of a book"
+  },
   "Ku7NJ+": {
     "defaultMessage": "The series files could not be found",
     "description": "Series view: files deleted"
@@ -1259,10 +1263,6 @@
     "defaultMessage": "Delete book files",
     "description": "Book delete dialog: title"
   },
-  "Nnjb9F": {
-    "defaultMessage": "Search books",
-    "description": "App bar: search field placeholder"
-  },
   "No9Upl": {
     "defaultMessage": "Title",
     "description": "Form edit series: General - series title"
@@ -1326,6 +1326,10 @@
   "P+WI/K": {
     "defaultMessage": "Duplicate page",
     "description": "Known Duplicate Page Table: alt description for thumbnail"
+  },
+  "P1LaVi": {
+    "defaultMessage": "Search",
+    "description": "App bar: search field placeholder"
   },
   "P8Ox+D": {
     "defaultMessage": "Book metadata updated: {book}",
@@ -2155,6 +2159,10 @@
     "defaultMessage": "Manually",
     "description": "Form edit read list: General - books ordering: manually"
   },
+  "bSewDz": {
+    "defaultMessage": "{count, plural, one {# match} other {# matches}}",
+    "description": "Search page: number of matches in the content of a book"
+  },
   "bSoeY6": {
     "defaultMessage": "Destination name",
     "description": "Import books table header: destination name"
@@ -2615,6 +2623,10 @@
     "defaultMessage": "Comment",
     "description": "API Key table header: key comment"
   },
+  "gRXxGy": {
+    "defaultMessage": "Books",
+    "description": "Search page: books results header"
+  },
   "ggaOkE": {
     "defaultMessage": "No data found",
     "description": "Duplicate Page Hash Matches Table: shown when table has no data"
@@ -2847,6 +2859,10 @@
     "defaultMessage": "Discard",
     "description": "Server settings: button to discard any changes made"
   },
+  "kl0bOP": {
+    "defaultMessage": "Search series, books, collections and read lists, or the text inside EPUB books",
+    "description": "Search page: empty state text when there is no search term"
+  },
   "knm6Z+": {
     "defaultMessage": "Status",
     "description": "Import books table header: status message"
@@ -2854,6 +2870,10 @@
   "kqV7EJ": {
     "defaultMessage": "Delete empty read lists after scan",
     "description": "Server settings: checkbox to delete empty readlists after scan"
+  },
+  "krotVT": {
+    "defaultMessage": "Collections",
+    "description": "Search page: collections results header"
   },
   "kvbi4j": {
     "defaultMessage": "User updated: {email}",
@@ -2942,6 +2962,14 @@
   "mQ3hSR": {
     "defaultMessage": "Label restrictions",
     "description": "User creation/edit dialog: label restrictions section header"
+  },
+  "miF9xr": {
+    "defaultMessage": "Read lists",
+    "description": "Search page: read lists results header"
+  },
+  "mpiVeE": {
+    "defaultMessage": "Show all matches",
+    "description": "Search page: button to show all the content matches of a book"
   },
   "n0TnQ2": {
     "defaultMessage": "Server unreachable",

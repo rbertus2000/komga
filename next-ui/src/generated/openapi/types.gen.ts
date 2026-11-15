@@ -64,9 +64,13 @@ export type AuthorUpdateDto = {
 
 export type BookDto = {
     /**
-     * Excerpts of the book content matching the full text search. HTML-escaped, with the matching terms enclosed in <mark> tags. Only present for paged full text searches matching the book content.
+     * Number of matches of the full text search in the book content. Only present for paged full text searches matching the book content.
      */
-    contentSnippets?: Array<string>;
+    contentMatchCount?: number;
+    /**
+     * Excerpts of the book content matching the full text search. Only present for paged full text searches matching the book content.
+     */
+    contentSnippets?: Array<ContentSnippetDto>;
     created: Date;
     deleted: boolean;
     fileHash: string;
@@ -204,6 +208,37 @@ export type CollectionUpdateDto = {
     name?: string;
     ordered?: boolean;
     seriesIds?: Array<string>;
+};
+
+export type ContentSnippetDto = {
+    /**
+     * Title of the table of contents entry the first match is under, if any.
+     */
+    chapter?: string;
+    /**
+     * Text of the first match, as found in the resource.
+     */
+    highlight: string;
+    /**
+     * Resource of the book containing the excerpt, as in the href of a progression locator.
+     */
+    href: string;
+    /**
+     * Number of matches in the excerpt. When the excerpts of a book have less matches than the book, there are more excerpts.
+     */
+    matchCount: number;
+    /**
+     * Zero-based index of the first match among the non-overlapping occurrences of the highlight in the text of the resource. Locates the match exactly.
+     */
+    occurrence: number;
+    /**
+     * Position of the first match within the resource, between 0 and 1. Computed from the text, so it is approximate.
+     */
+    progression: number;
+    /**
+     * HTML-escaped excerpt, with the matching terms enclosed in <mark> tags.
+     */
+    text: string;
 };
 
 export type DirectoryListingDto = {
@@ -1881,6 +1916,35 @@ export type BookAnalyzeResponses = {
      */
     202: unknown;
 };
+
+export type GetBookContentSnippetsData = {
+    body?: never;
+    path: {
+        bookId: string;
+    };
+    query: {
+        search: string;
+    };
+    url: '/api/v1/books/{bookId}/content-snippets';
+};
+
+export type GetBookContentSnippetsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationErrorResponse;
+};
+
+export type GetBookContentSnippetsError = GetBookContentSnippetsErrors[keyof GetBookContentSnippetsErrors];
+
+export type GetBookContentSnippetsResponses = {
+    /**
+     * OK
+     */
+    200: Array<ContentSnippetDto>;
+};
+
+export type GetBookContentSnippetsResponse = GetBookContentSnippetsResponses[keyof GetBookContentSnippetsResponses];
 
 export type DeleteBookFileData = {
     body?: never;

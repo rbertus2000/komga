@@ -90,8 +90,8 @@ watch(routeSearch, (it) => (search.value = it))
 
 const searchMessage = intl.formatMessage({
   description: 'App bar: search field placeholder',
-  defaultMessage: 'Search books',
-  id: 'Nnjb9F',
+  defaultMessage: 'Search',
+  id: 'P1LaVi',
 })
 
 const expandMessage = intl.formatMessage({

@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw'
 import mockThumbnailUrl from '@/assets/mock-thumbnail.jpg'
 import {
   handleGetBookById,
+  handleGetBookContentSnippets,
   handleGetBookPageByNumber,
   handleGetBookPages,
   handleGetBooks,
@@ -11,7 +12,7 @@ import {
   handleImportBooks,
 } from '@/generated/openapi/msw.gen'
 import { response200OK, response202Empty, response404NotFound } from '@/mocks/api/utils'
-import type { BookDto, BookSearch } from '@/generated/openapi'
+import type { BookDto, BookSearch, ContentSnippetDto } from '@/generated/openapi'
 import { mockTransientBookAnalyzed3 } from '@/mocks/api/handlers/transient-books'
 
 export const mockBook = {
@@ -103,7 +104,56 @@ export function mockBooks(count: number): BookDto[] {
   )
 }
 
+const mockContentSnippets: ContentSnippetDto[] = [
+  {
+    text: `disguise had completely fooled the Earthmen; they didn&#39;t even suspect that a <mark>Valdorian</mark> spy was among the engineers`,
+    href: 'OEBPS/chapter 1.xhtml',
+    chapter: 'Chapter 1',
+    progression: 0.25,
+    highlight: 'Valdorian',
+    occurrence: 3,
+    matchCount: 1,
+  },
+  {
+    text: `&quot;Yes. She&#39;s a real beauty,&quot; the <mark>Valdorian</mark> said`,
+    href: 'OEBPS/chapter 2.xhtml',
+    chapter: 'Chapter 2',
+    progression: 0.5,
+    highlight: 'Valdorian',
+    occurrence: 0,
+    matchCount: 1,
+  },
+  {
+    text: `Without a word, the <mark>Valdorian</mark> leaped forward, taking the Earthman by surprise`,
+    href: 'OEBPS/chapter 2.xhtml',
+    chapter: 'Chapter 2',
+    progression: 0.6,
+    highlight: 'Valdorian',
+    occurrence: 1,
+    matchCount: 1,
+  },
+  {
+    text: `the <mark>Valdorian</mark> managed to grasp the foot and twist`,
+    href: 'OEBPS/chapter 2.xhtml',
+    chapter: 'Chapter 2',
+    progression: 0.7,
+    highlight: 'Valdorian',
+    occurrence: 2,
+    matchCount: 1,
+  },
+  {
+    text: `back to the <mark>Valdorian</mark> home world`,
+    href: 'OEBPS/chapter 3.xhtml',
+    chapter: 'Chapter 3',
+    progression: 0.1,
+    highlight: 'Valdorian',
+    occurrence: 0,
+    matchCount: 1,
+  },
+]
+
 export const booksHandlers = [
+  handleGetBookContentSnippets(() => response200OK(mockContentSnippets)),
   handleGetBooks(async ({ request }) => {
     const query = new URL(request.url).searchParams
     const search = (await request.json().catch(() => ({}))) as BookSearch
@@ -113,10 +163,10 @@ export const booksHandlers = [
           index % 2 === 0
             ? {
                 ...book,
-                contentSnippets: [
-                  `disguise had completely fooled the Earthmen; they didn&#39;t even suspect that a <mark>Valdorian</mark> spy was among the engineers`,
-                  `&quot;Yes. She&#39;s a real beauty,&quot; the <mark>Valdorian</mark> said`,
-                ],
+                // the search only returns the best snippets
+                contentSnippets: mockContentSnippets.slice(0, 3),
+                // every other of those books has more snippets, the others have all their matches in the best snippets
+                contentMatchCount: index % 4 === 0 ? mockContentSnippets.length : 3,
               }
             : book,
         )
