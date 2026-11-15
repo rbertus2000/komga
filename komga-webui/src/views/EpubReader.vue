@@ -331,6 +331,7 @@ import {getBookReadRouteFromMedia} from '@/functions/book-format'
 import SettingsSelect from '@/components/SettingsSelect.vue'
 import {createR2Progression, r2ProgressionToReadingPosition} from '@/functions/readium'
 import {debounce} from 'lodash'
+import {R2Progression} from '@/types/readium'
 
 export default Vue.extend({
   name: 'EpubReader',
@@ -438,6 +439,7 @@ export default Vue.extend({
       progressionPageCount: undefined as number,
       effectiveDirection: 'ltr',
       fixedLayout: false,
+      searchHighlight: undefined as string,
     }
   },
   created() {
@@ -727,7 +729,18 @@ export default Vue.extend({
       this.book = await this.$komgaBooks.getBook(bookId)
       this.series = await this.$komgaSeries.getOneSeries(this.book.seriesId)
 
-      const progression = await this.$komgaBooks.getProgression(bookId)
+      // a location in the query (from a search result) takes precedence over the saved progression
+      const progression = this.$route.query.href
+        ? {
+          modified: new Date(),
+          locator: {
+            href: this.$route.query.href.toString(),
+            type: 'application/xhtml+xml',
+            locations: {progression: Number(this.$route.query.progression) || 0},
+          },
+        } as R2Progression
+        : await this.$komgaBooks.getProgression(bookId)
+      this.searchHighlight = this.$route.query.href ? this.$route.query.highlight?.toString() : undefined
       const initialLocation = r2ProgressionToReadingPosition(progression, bookId)
 
       // parse query params to get context and contextId
@@ -814,6 +827,7 @@ export default Vue.extend({
         },
         api: {
           updateCurrentLocation: this.updateCurrentLocation,
+          resourceReady: this.highlightSearchMatch,
           keydownFallthrough: this.keyPressed,
           clickThrough: this.clickThrough,
           positionInfo: this.updatePositionInfo,
@@ -848,6 +862,58 @@ export default Vue.extend({
       } catch (e) {
         this.siblingPrevious = {} as BookDto
       }
+    },
+    /**
+     * Marks the match of a search result in the resource the reader was opened at, and goes to it.
+     * Called once the resource is displayed at the approximate location given in the query.
+     */
+    highlightSearchMatch() {
+      const text = this.searchHighlight
+      // only once: the match is in the first resource loaded
+      this.searchHighlight = undefined
+      const doc = (document.querySelector('#iframe-wrapper iframe') as HTMLIFrameElement)?.contentDocument
+      if (!text || !doc?.body) return
+
+      // the text of the resource as indexed by the server, along with where each text node starts in it
+      const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
+        acceptNode: n => ['SCRIPT', 'STYLE'].includes(n.parentElement?.tagName.toUpperCase()) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+      })
+      const nodes = [] as { node: Text, start: number }[]
+      let content = ''
+      while (walker.nextNode()) {
+        nodes.push({node: walker.currentNode as Text, start: content.length})
+        content += walker.currentNode.nodeValue
+      }
+
+      // the server collapses whitespace and removes invisible characters (soft hyphen, zero width space), the resource has them
+      const regex = new RegExp(
+        Array.from(text.trim().replace(/\s+/g, ' '))
+          .map(c => c === ' ' ? '\\s+' : this.$_.escapeRegExp(c))
+          .join('[\\u00AD\\u200B]*'),
+        'g')
+      const matches = Array.from(content.matchAll(regex))
+      // the same text can occur several times: the server tells which occurrence it is.
+      // Should the texts differ, fall back to the occurrence closest to the expected location.
+      const expected = (Number(this.$route.query.progression) || 0) * content.length
+      const match = matches[Number(this.$route.query.occurrence)] ?? this.$_.minBy(matches, m => Math.abs(m.index - expected))
+      if (!match) return
+
+      // ponytail: a match spread over several text nodes (e.g. partly in italics) is only marked in the first one
+      const {node, start} = this.$_.findLast(nodes, n => n.start <= match.index)
+      const range = doc.createRange()
+      range.setStart(node, match.index - start)
+      range.setEnd(node, Math.min(node.length, match.index - start + match[0].length))
+      const mark = doc.createElement('mark')
+      mark.id = 'komga-search-match'
+      // the reader stylesheets do not style <mark> like the text around it
+      mark.style.font = 'inherit'
+      range.surroundContents(mark)
+
+      // the href must be the one of the loaded resource, else the reader loads it again, without the mark
+      this.d2Reader.goTo({
+        href: (this.d2Reader as any).navigator.currentChapterLink.href,
+        locations: {fragment: mark.id},
+      })
     },
     historyBack() {
       this.d2Reader.historyBack()
