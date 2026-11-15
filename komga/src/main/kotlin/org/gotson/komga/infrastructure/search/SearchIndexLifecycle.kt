@@ -11,6 +11,7 @@ import org.gotson.komga.domain.model.SeriesCollection
 import org.gotson.komga.domain.persistence.ReadListRepository
 import org.gotson.komga.domain.persistence.SeriesCollectionRepository
 import org.gotson.komga.infrastructure.mediacontainer.epub.EpubExtractor
+import org.gotson.komga.infrastructure.mediacontainer.epub.EpubResourceText
 import org.gotson.komga.interfaces.api.persistence.BookDtoRepository
 import org.gotson.komga.interfaces.api.persistence.SeriesDtoRepository
 import org.gotson.komga.interfaces.api.rest.dto.BookDto
@@ -24,7 +25,7 @@ import kotlin.math.ceil
 import kotlin.time.measureTime
 
 private val logger = KotlinLogging.logger {}
-private const val INDEX_VERSION = 9
+private const val INDEX_VERSION = 12
 
 @Component
 class SearchIndexLifecycle(
@@ -36,7 +37,18 @@ class SearchIndexLifecycle(
   private val epubExtractor: EpubExtractor,
 ) {
   fun indexBookContent(book: Book) {
-    luceneHelper.updateDocument(Term(LuceneEntity.BookContent.id, book.id), bookContentDocument(book.id, epubExtractor.getText(book.path)))
+    bookDtoRepository.findByIdOrNull(book.id, "unused")?.bookToDocument()?.let { indexBookContent(book.id, epubExtractor.getText(book.path), it) }
+  }
+
+  private fun indexBookContent(
+    bookId: String,
+    resources: List<EpubResourceText>,
+    bookDocument: Document,
+  ) {
+    luceneHelper.updateDocuments(
+      Term(LuceneEntity.BookContent.id, bookId),
+      resources.map { bookContentDocument(bookId, it, bookDocument) },
+    )
   }
 
   fun upgradeIndex() {
@@ -99,7 +111,13 @@ class SearchIndexLifecycle(
       is DomainEvent.SeriesDeleted -> deleteEntity(LuceneEntity.Series, event.series.id)
 
       is DomainEvent.BookAdded -> bookDtoRepository.findByIdOrNull(event.book.id, "unused")?.bookToDocument()?.let { addEntity(it) }
-      is DomainEvent.BookUpdated -> bookDtoRepository.findByIdOrNull(event.book.id, "unused")?.bookToDocument()?.let { updateEntity(LuceneEntity.Book, event.book.id, it) }
+      is DomainEvent.BookUpdated ->
+        bookDtoRepository.findByIdOrNull(event.book.id, "unused")?.bookToDocument()?.let { bookDocument ->
+          updateEntity(LuceneEntity.Book, event.book.id, bookDocument)
+          // the content documents carry the metadata: index them again, from the text they store rather than from the file
+          // ponytail: analyzes the whole text again on each metadata change. Join the content to the book document (lucene-join) if that gets too slow.
+          luceneHelper.getBookContent(event.book.id).ifEmpty { null }?.let { indexBookContent(event.book.id, it, bookDocument) }
+        }
       is DomainEvent.BookDeleted -> {
         deleteEntity(LuceneEntity.Book, event.book.id)
         deleteEntity(LuceneEntity.BookContent, event.book.id)

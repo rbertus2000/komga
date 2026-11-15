@@ -469,6 +469,23 @@ class BookControllerTest(
 
     @Test
     @WithMockCustomUser(sharedAllLibraries = false, sharedLibraries = [])
+    fun `given user with no access to any library when getting specific book content snippets then returns forbidden`() {
+      makeSeries(name = "series", libraryId = library.id).let { series ->
+        seriesLifecycle.createSeries(series).let { created ->
+          val books = listOf(makeBook("1", libraryId = library.id))
+          seriesLifecycle.addBooks(created, books)
+        }
+      }
+
+      val book = bookRepository.findAll().first()
+
+      mockMvc
+        .get("/api/v1/books/${book.id}/content-snippets?search=word")
+        .andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    @WithMockCustomUser(sharedAllLibraries = false, sharedLibraries = [])
     fun `given user with no access to any library when getting specific book thumbnail then returns forbidden`() {
       makeSeries(name = "series", libraryId = library.id).let { series ->
         seriesLifecycle.createSeries(series).let { created ->

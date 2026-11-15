@@ -159,9 +159,14 @@ class BookDtoDao(
             .apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
             .fetchAndMap(dsl)
             .let { books ->
-              // only for paged requests, as highlighting loads the whole text of each book
+              // only for paged requests, as highlighting loads the text of the matching resources of each book
               val snippets = if (pageable.isPaged) luceneHelper.highlightBookContent(searchTerm, books.map { it.id }) else emptyMap()
-              if (snippets.isEmpty()) books else books.map { it.copy(contentSnippets = snippets[it.id]) }
+              if (snippets.isEmpty()) {
+                books
+              } else {
+                val counts = luceneHelper.countBookContentMatches(searchTerm, snippets.keys)
+                books.map { it.copy(contentSnippets = snippets[it.id], contentMatchCount = counts[it.id]) }
+              }
             }
 
       val count =

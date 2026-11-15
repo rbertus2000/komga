@@ -39,6 +39,7 @@ import org.gotson.komga.infrastructure.mediacontainer.ContentDetector
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration
 import org.gotson.komga.infrastructure.openapi.PageableAsQueryParam
 import org.gotson.komga.infrastructure.openapi.PageableWithoutSortAsQueryParam
+import org.gotson.komga.infrastructure.search.LuceneHelper
 import org.gotson.komga.infrastructure.security.KomgaPrincipal
 import org.gotson.komga.infrastructure.web.getMediaTypeOrDefault
 import org.gotson.komga.interfaces.api.CommonBookController
@@ -54,6 +55,7 @@ import org.gotson.komga.interfaces.api.persistence.BookDtoRepository
 import org.gotson.komga.interfaces.api.rest.dto.BookDto
 import org.gotson.komga.interfaces.api.rest.dto.BookImportBatchDto
 import org.gotson.komga.interfaces.api.rest.dto.BookMetadataUpdateDto
+import org.gotson.komga.interfaces.api.rest.dto.ContentSnippetDto
 import org.gotson.komga.interfaces.api.rest.dto.PageDto
 import org.gotson.komga.interfaces.api.rest.dto.R2Positions
 import org.gotson.komga.interfaces.api.rest.dto.ReadListDto
@@ -115,6 +117,7 @@ class BookController(
   private val webPubGenerator: WebPubGenerator,
   private val contentRestrictionChecker: ContentRestrictionChecker,
   private val commonBookController: CommonBookController,
+  private val luceneHelper: LuceneHelper,
 ) {
   @Deprecated("use /v1/books/list instead")
   @PageableAsQueryParam
@@ -282,6 +285,18 @@ class BookController(
 
       it.restrictUrl(!principal.user.isAdmin)
     } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+
+  @Operation(summary = "List book's content excerpts", description = "Excerpts of the book content matching a full text search, in reading order. Limited to 1000 excerpts.", tags = [OpenApiConfiguration.TagNames.BOOKS])
+  @GetMapping("api/v1/books/{bookId}/content-snippets")
+  fun getBookContentSnippets(
+    @AuthenticationPrincipal principal: KomgaPrincipal,
+    @PathVariable bookId: String,
+    @RequestParam(name = "search") search: String,
+  ): List<ContentSnippetDto> {
+    contentRestrictionChecker.checkContentRestrictionBook(principal.user, bookId)
+
+    return luceneHelper.highlightBookContent(search, listOf(bookId), all = true)[bookId].orEmpty()
+  }
 
   @Operation(summary = "Get previous book in series", tags = [OpenApiConfiguration.TagNames.BOOKS])
   @GetMapping("api/v1/books/{bookId}/previous")

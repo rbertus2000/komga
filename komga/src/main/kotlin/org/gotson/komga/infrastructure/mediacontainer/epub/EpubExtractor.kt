@@ -15,6 +15,8 @@ import org.gotson.komga.infrastructure.util.getEntryBytes
 import org.gotson.komga.infrastructure.util.getEntryInputStream
 import org.gotson.komga.infrastructure.util.getZipEntryBytes
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
+import org.jsoup.nodes.Node
 import org.jsoup.parser.Parser
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -28,6 +30,62 @@ import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 private val logger = KotlinLogging.logger {}
+
+/**
+ * Text of a resource of an epub.
+ *
+ * @property chapters titles of the table of contents that apply to the text, with the offset in the text where each one starts. Sorted by offset.
+ */
+data class EpubResourceText(
+  val href: String,
+  val text: String,
+  val chapters: List<Pair<Int, String>> = emptyList(),
+) {
+  /**
+   * @return the title that applies at the [offset] in the text
+   */
+  fun chapterAt(offset: Int): String? = chapters.lastOrNull { it.first <= offset }?.second
+}
+
+private fun List<EpubTocEntry>.flatten(): List<EpubTocEntry> = flatMap { listOf(it) + it.children.flatten() }
+
+/**
+ * @param toc the entries of the table of contents, in reading order
+ * @return the titles of the entries that point to the resource [fileName], with the offset of their target in the text of the [body]. Sorted by offset.
+ */
+internal fun chaptersOf(
+  fileName: String,
+  body: Element,
+  toc: List<EpubTocEntry>,
+): List<Pair<Int, String>> =
+  toc
+    .filter { it.href?.substringBeforeLast("#") == fileName }
+    .map { entry ->
+      val anchor = entry.href!!.substringAfterLast("#", "")
+      // without an anchor, or with one that cannot be found, the entry points to the start of the resource
+      (if (anchor.isBlank()) 0 else textOffset(body, anchor) ?: 0) to entry.title
+    }.sortedBy { it.first }
+
+/**
+ * @return the offset in the text of the [body] where the element with the given ID or name starts, null if there is no such element
+ */
+internal fun textOffset(
+  body: Element,
+  anchor: String,
+): Int? {
+  // the text before the element is the text of a copy of the body, without the element and all that follows it
+  val copy = body.clone()
+  val element = copy.getElementById(anchor) ?: copy.getElementsByAttributeValue("name", anchor).first() ?: return null
+  if (element === copy) return 0
+
+  var node: Node = element
+  while (node !== copy) {
+    while (node.nextSibling() != null) node.nextSibling()!!.remove()
+    node = node.parent() ?: break
+  }
+  element.remove()
+  return copy.text().length
+}
 
 @Service
 class EpubExtractor(
@@ -85,12 +143,21 @@ class EpubExtractor(
   /**
    * Extracts the text of the documents in the reading order
    */
-  fun getText(path: Path): String =
+  fun getText(path: Path): List<EpubResourceText> =
     path.epub { epub ->
+      val toc = getToc(epub).flatten()
+      // a chapter can span several resources: the title that applies at the end of a resource applies at the start of the next one
+      var title: String? = null
+
       getResources(epub)
         .filter { it.subType == MediaFile.SubType.EPUB_PAGE && it.mediaType?.contains("html", true) == true }
-        .mapNotNull { page -> epub.zip.getEntryInputStream(page.fileName)?.use { Jsoup.parse(it, null, "").body().text() } }
-        .joinToString("\n")
+        .distinctBy { it.fileName }
+        .mapNotNull { page ->
+          val body = epub.zip.getEntryInputStream(page.fileName)?.use { Jsoup.parse(it, null, "").body() } ?: return@mapNotNull null
+          val chapters = listOfNotNull(title?.let { 0 to it }) + chaptersOf(page.fileName, body, toc)
+          title = chapters.lastOrNull()?.second
+          EpubResourceText(page.fileName, body.text(), chapters)
+        }.filter { it.text.isNotBlank() }
     }
 
   fun getResources(epub: EpubPackage): List<MediaFile> {

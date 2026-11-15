@@ -34,7 +34,7 @@ class SearchIndexController(
 
         indexVersion < 8 -> taskEmitter.rebuildIndex(HIGHEST_PRIORITY, setOf(LuceneEntity.Series, LuceneEntity.BookContent))
 
-        indexVersion < 9 -> taskEmitter.rebuildIndex(HIGHEST_PRIORITY, setOf(LuceneEntity.BookContent))
+        indexVersion < 12 -> taskEmitter.rebuildIndex(HIGHEST_PRIORITY, setOf(LuceneEntity.BookContent))
       }
     }
   }

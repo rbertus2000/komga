@@ -31,9 +31,30 @@ data class BookDto(
   val deleted: Boolean,
   val fileHash: String,
   val oneshot: Boolean,
-  @get:Schema(description = "Excerpts of the book content matching the full text search. HTML-escaped, with the matching terms enclosed in <mark> tags. Only present for paged full text searches matching the book content.")
+  @get:Schema(description = "Excerpts of the book content matching the full text search. Only present for paged full text searches matching the book content.")
   @get:JsonInclude(JsonInclude.Include.NON_NULL)
-  val contentSnippets: List<String>? = null,
+  val contentSnippets: List<ContentSnippetDto>? = null,
+  @get:Schema(description = "Number of matches of the full text search in the book content. Only present for paged full text searches matching the book content.")
+  @get:JsonInclude(JsonInclude.Include.NON_NULL)
+  val contentMatchCount: Int? = null,
+)
+
+data class ContentSnippetDto(
+  @get:Schema(description = "HTML-escaped excerpt, with the matching terms enclosed in <mark> tags.")
+  val text: String,
+  @get:Schema(description = "Resource of the book containing the excerpt, as in the href of a progression locator.")
+  val href: String,
+  @get:Schema(description = "Position of the first match within the resource, between 0 and 1. Computed from the text, so it is approximate.")
+  val progression: Float,
+  @get:Schema(description = "Text of the first match, as found in the resource.")
+  val highlight: String,
+  @get:Schema(description = "Zero-based index of the first match among the non-overlapping occurrences of the highlight in the text of the resource. Locates the match exactly.")
+  val occurrence: Int,
+  @get:Schema(description = "Number of matches in the excerpt. When the excerpts of a book have less matches than the book, there are more excerpts.")
+  val matchCount: Int,
+  @get:Schema(description = "Title of the table of contents entry the first match is under, if any.")
+  @get:JsonInclude(JsonInclude.Include.NON_NULL)
+  val chapter: String? = null,
 )
 
 fun BookDto.restrictUrl(restrict: Boolean) = if (restrict) copy(url = FilenameUtils.getName(url)) else this

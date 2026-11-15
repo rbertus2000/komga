@@ -1112,6 +1112,59 @@
         ]
       }
     },
+    "/api/v1/books/{bookId}/content-snippets": {
+      "get": {
+        "description": "Excerpts of the book content matching a full text search, in reading order. Limited to 1000 excerpts.",
+        "operationId": "getBookContentSnippets",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bookId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContentSnippetDto"
+                  }
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "List book's content excerpts",
+        "tags": [
+          "Books"
+        ]
+      }
+    },
     "/api/v1/books/{bookId}/file": {
       "delete": {
         "description": "Required role: **ADMIN**",
@@ -10252,11 +10305,16 @@
       "BookDto": {
         "type": "object",
         "properties": {
+          "contentMatchCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of matches of the full text search in the book content. Only present for paged full text searches matching the book content."
+          },
           "contentSnippets": {
             "type": "array",
-            "description": "Excerpts of the book content matching the full text search. HTML-escaped, with the matching terms enclosed in <mark> tags. Only present for paged full text searches matching the book content.",
+            "description": "Excerpts of the book content matching the full text search. Only present for paged full text searches matching the book content.",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/ContentSnippetDto"
             }
           },
           "created": {
@@ -10770,6 +10828,50 @@
             }
           }
         }
+      },
+      "ContentSnippetDto": {
+        "type": "object",
+        "properties": {
+          "chapter": {
+            "type": "string",
+            "description": "Title of the table of contents entry the first match is under, if any."
+          },
+          "highlight": {
+            "type": "string",
+            "description": "Text of the first match, as found in the resource."
+          },
+          "href": {
+            "type": "string",
+            "description": "Resource of the book containing the excerpt, as in the href of a progression locator."
+          },
+          "matchCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of matches in the excerpt. When the excerpts of a book have less matches than the book, there are more excerpts."
+          },
+          "occurrence": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Zero-based index of the first match among the non-overlapping occurrences of the highlight in the text of the resource. Locates the match exactly."
+          },
+          "progression": {
+            "type": "number",
+            "format": "float",
+            "description": "Position of the first match within the resource, between 0 and 1. Computed from the text, so it is approximate."
+          },
+          "text": {
+            "type": "string",
+            "description": "HTML-escaped excerpt, with the matching terms enclosed in <mark> tags."
+          }
+        },
+        "required": [
+          "highlight",
+          "href",
+          "matchCount",
+          "occurrence",
+          "progression",
+          "text"
+        ]
       },
       "DirectoryListingDto": {
         "type": "object",

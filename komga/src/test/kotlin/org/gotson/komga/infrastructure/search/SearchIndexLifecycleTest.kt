@@ -4,6 +4,7 @@ import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import io.mockk.slot
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.entry
 import org.gotson.komga.domain.model.BookSearch
 import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.ReadList
@@ -23,6 +24,7 @@ import org.gotson.komga.domain.service.LibraryLifecycle
 import org.gotson.komga.domain.service.ReadListLifecycle
 import org.gotson.komga.domain.service.SeriesCollectionLifecycle
 import org.gotson.komga.domain.service.SeriesLifecycle
+import org.gotson.komga.infrastructure.mediacontainer.epub.EpubExtractor
 import org.gotson.komga.interfaces.api.persistence.BookDtoRepository
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
@@ -36,6 +38,7 @@ import org.springframework.context.ApplicationEventPublisher
 import org.springframework.core.io.ClassPathResource
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
+import kotlin.math.roundToInt
 
 @SpringBootTest
 class SearchIndexLifecycleTest(
@@ -53,6 +56,7 @@ class SearchIndexLifecycleTest(
   @Autowired private val searchIndexLifecycle: SearchIndexLifecycle,
   @Autowired private val luceneHelper: LuceneHelper,
   @Autowired private val bookDtoRepository: BookDtoRepository,
+  @Autowired private val epubExtractor: EpubExtractor,
 ) {
   private val library = makeLibrary()
 
@@ -118,9 +122,15 @@ class SearchIndexLifecycleTest(
       assertThat(luceneHelper.searchBookIds("skyjump")).isEmpty()
       assertThat(luceneHelper.searchBookIds("skyjump*")).containsExactly(book.id)
       assertThat(luceneHelper.searchBookIds("valdorian unicorn")).isEmpty()
-      // negative-only and fielded queries do not apply to content
+      // a search that does not look for anything in the content is left to the book documents
       assertThat(luceneHelper.searchEntitiesIds("-unicorn", LuceneEntity.BookContent)).isEmpty()
-      assertThat(luceneHelper.searchEntitiesIds("valdorian -tag:x", LuceneEntity.BookContent)).isEmpty()
+      assertThat(luceneHelper.searchEntitiesIds("title:book", LuceneEntity.BookContent)).isEmpty()
+      assertThat(luceneHelper.searchEntitiesIds("title:book -valdorian", LuceneEntity.BookContent)).isEmpty()
+      // content can be combined with the metadata of the book
+      assertThat(luceneHelper.searchBookIds("valdorian AND title:book")).containsExactly(book.id)
+      assertThat(luceneHelper.searchBookIds("valdorian -tag:x")).containsExactly(book.id)
+      assertThat(luceneHelper.searchBookIds("valdorian AND title:other")).isEmpty()
+      assertThat(luceneHelper.searchBookIds("valdorian -title:book")).isEmpty()
     }
 
     @Test
@@ -132,27 +142,92 @@ class SearchIndexLifecycleTest(
 
       val excerpts = luceneHelper.highlightBookContent("valdorian", listOf(book.id, "unknown"))
       assertThat(excerpts.keys).containsExactly(book.id)
-      assertThat(excerpts[book.id]).isNotEmpty.hasSizeLessThanOrEqualTo(3).allSatisfy { assertThat(it).contains("<mark>Valdorian</mark>").hasSizeLessThan(400) }
+      // excerpts are located in a resource of the book
+      val resources = epubExtractor.getText(book.path).associate { it.href to it.text }
+      assertThat(excerpts[book.id]).isNotEmpty.hasSizeLessThanOrEqualTo(3).allSatisfy {
+        assertThat(it.text).contains("<mark>Valdorian</mark>").hasSizeLessThan(400)
+        assertThat(it.progression).isBetween(0F, 1F)
+        val text = resources[it.href]!!
+        val offset = (it.progression * text.length).roundToInt()
+        assertThat(text.substring(offset)).startsWith(it.highlight)
+        assertThat(it.highlight).isEqualToIgnoringCase("valdorian")
+        // the occurrence locates the match exactly
+        assertThat(
+          Regex
+            .fromLiteral(it.highlight)
+            .findAll(text)
+            .elementAt(it.occurrence)
+            .range.first,
+        ).isEqualTo(offset)
+      }
+      // a word that occurs many times
+      assertThat(luceneHelper.highlightBookContent("harris airlock", listOf(book.id))[book.id]).anyMatch { it.occurrence > 0 }.allSatisfy {
+        val text = resources[it.href]!!
+        assertThat(
+          Regex
+            .fromLiteral(it.highlight)
+            .findAll(text)
+            .elementAt(it.occurrence)
+            .range.first,
+        ).isEqualTo((it.progression * text.length).roundToInt())
+      }
+
+      // all the excerpts, in reading order
+      val all = luceneHelper.highlightBookContent("valdorian", listOf(book.id), all = true)[book.id]!!
+      assertThat(all).hasSizeGreaterThan(3).containsAll(excerpts[book.id])
+      assertThat(all).isSortedAccordingTo(compareBy({ resources.keys.indexOf(it.href) }, { it.progression }))
+      assertThat(all.map { it.href to it.occurrence }).doesNotHaveDuplicates()
+      // the chapter of the table of contents starts in a resource before the one of the excerpts
+      assertThat(all).allSatisfy { assertThat(it.chapter).isEqualTo("The Incomplete Theft") }
+
+      // the matches are counted without the excerpts: every match is marked in an excerpt
+      assertThat(luceneHelper.countBookContentMatches("valdorian", listOf(book.id, "unknown")))
+        .containsExactly(entry(book.id, all.sumOf { Regex("<mark>").findAll(it.text).count() }))
+      assertThat(luceneHelper.countBookContentMatches("unicorn", listOf(book.id))).isEmpty()
+
+      // there are more excerpts than the best ones when the best ones do not have all the matches of the book
+      listOf("valdorian", "\"valdorian spy\"", "skyjumper", "airlock", "harris airlock", "harris", "guards", "lieutenant", "generator", "computer", "corridor", "the").forEach { term ->
+        val count = luceneHelper.countBookContentMatches(term, listOf(book.id))[book.id]
+        val best = luceneHelper.highlightBookContent(term, listOf(book.id))[book.id].orEmpty()
+        val every = luceneHelper.highlightBookContent(term, listOf(book.id), all = true)[book.id].orEmpty()
+        assertThat(every.sumOf { it.matchCount }).`as`(term).isEqualTo(count ?: 0)
+        assertThat(every.size > best.size).`as`(term).isEqualTo((count ?: 0) > best.sumOf { it.matchCount })
+      }
+      assertThat(luceneHelper.countBookContentMatches("title:valdorian", listOf(book.id))).isEmpty()
 
       // excerpts are HTML-escaped
       assertThat(luceneHelper.highlightBookContent("blane", listOf(book.id))[book.id])
         .isNotEmpty
-        .allSatisfy { assertThat(it).contains("<mark>Blane</mark>").doesNotContain("\"", "'") }
+        .allSatisfy { assertThat(it.text).contains("<mark>Blane</mark>").doesNotContain("\"", "'") }
 
       assertThat(luceneHelper.highlightBookContent("unicorn", listOf(book.id))).isEmpty()
       assertThat(luceneHelper.highlightBookContent("title:valdorian", listOf(book.id))).isEmpty()
+      // combined with metadata: only the content is highlighted
+      assertThat(luceneHelper.highlightBookContent("valdorian AND title:book", listOf(book.id))[book.id])
+        .isNotEmpty
+        .allSatisfy { assertThat(it.highlight).isEqualToIgnoringCase("valdorian") }
+      assertThat(luceneHelper.highlightBookContent("valdorian AND title:other", listOf(book.id))).isEmpty()
 
       val search = BookSearch(fullTextSearch = "\"valdorian spy\"")
       assertThat(bookDtoRepository.findAll(search, SearchContext.ofAnonymousUser(), PageRequest.of(0, 10)).content)
         .singleElement()
-        .satisfies({ assertThat(it.contentSnippets).singleElement().asString().contains("<mark>Valdorian spy</mark>") })
+        .satisfies({
+          assertThat(it.contentSnippets).isNotEmpty.allSatisfy { snippet -> assertThat(snippet.text).contains("<mark>Valdorian spy</mark>") }
+          assertThat(it.contentMatchCount).isEqualTo(1)
+        })
       assertThat(bookDtoRepository.findAll(search, SearchContext.ofAnonymousUser(), Pageable.unpaged()).content)
         .singleElement()
-        .satisfies({ assertThat(it.contentSnippets).isNull() })
+        .satisfies({
+          assertThat(it.contentSnippets).isNull()
+          assertThat(it.contentMatchCount).isNull()
+        })
       // match on metadata only
       assertThat(bookDtoRepository.findAll(BookSearch(fullTextSearch = "book"), SearchContext.ofAnonymousUser(), PageRequest.of(0, 10)).content)
         .singleElement()
-        .satisfies({ assertThat(it.contentSnippets).isNull() })
+        .satisfies({
+          assertThat(it.contentSnippets).isNull()
+          assertThat(it.contentMatchCount).isNull()
+        })
     }
 
     @Test
@@ -162,8 +237,16 @@ class SearchIndexLifecycleTest(
       seriesLifecycle.addBooks(series, listOf(book))
       searchIndexLifecycle.indexBookContent(book)
 
+      // the metadata searched along with the content follows the book
+      bookMetadataRepository.findById(book.id).let { bookMetadataRepository.update(it.copy(title = "updated")) }
       mockEventPublisher.publishEvent(DomainEvent.BookUpdated(book))
       assertThat(luceneHelper.searchBookIds("valdorian")).containsExactly(book.id)
+      assertThat(luceneHelper.searchBookIds("valdorian AND title:updated")).containsExactly(book.id)
+      assertThat(luceneHelper.searchBookIds("valdorian AND title:book")).isEmpty()
+      // what was extracted from the file is kept
+      assertThat(luceneHelper.highlightBookContent("valdorian AND title:updated", listOf(book.id))[book.id])
+        .isNotEmpty
+        .allSatisfy { assertThat(it.chapter).isEqualTo("The Incomplete Theft") }
 
       seriesLifecycle.deleteMany(listOf(series))
       assertThat(luceneHelper.searchBookIds("valdorian")).isEmpty()
