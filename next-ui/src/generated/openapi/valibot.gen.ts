@@ -949,6 +949,7 @@ export const vBookMetadataDto = v.object({
 });
 
 export const vBookDto = v.object({
+    contentSnippets: v.optional(v.array(v.string())),
     created: v.pipe(v.string(), v.isoTimestamp(), v.transform((val: string): Date => new Date(val))),
     deleted: v.boolean(),
     fileHash: v.string(),

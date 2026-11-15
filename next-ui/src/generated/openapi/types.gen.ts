@@ -63,6 +63,10 @@ export type AuthorUpdateDto = {
 };
 
 export type BookDto = {
+    /**
+     * Excerpts of the book content matching the full text search. HTML-escaped, with the matching terms enclosed in <mark> tags. Only present for paged full text searches matching the book content.
+     */
+    contentSnippets?: Array<string>;
     created: Date;
     deleted: boolean;
     fileHash: string;
@@ -1840,10 +1844,6 @@ export type GetBookByIdErrors = {
      * Bad Request
      */
     400: ValidationErrorResponse;
-    /**
-     * Not Found
-     */
-    404: unknown;
 };
 
 export type GetBookByIdError = GetBookByIdErrors[keyof GetBookByIdErrors];
@@ -4644,10 +4644,6 @@ export type GetSeriesByIdErrors = {
      * Bad Request
      */
     400: ValidationErrorResponse;
-    /**
-     * Not Found
-     */
-    404: unknown;
 };
 
 export type GetSeriesByIdError = GetSeriesByIdErrors[keyof GetSeriesByIdErrors];

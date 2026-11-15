@@ -11,7 +11,7 @@ import {
   handleImportBooks,
 } from '@/generated/openapi/msw.gen'
 import { response200OK, response202Empty, response404NotFound } from '@/mocks/api/utils'
-import type { BookDto } from '@/generated/openapi'
+import type { BookDto, BookSearch } from '@/generated/openapi'
 import { mockTransientBookAnalyzed3 } from '@/mocks/api/handlers/transient-books'
 
 export const mockBook = {
@@ -104,11 +104,26 @@ export function mockBooks(count: number): BookDto[] {
 }
 
 export const booksHandlers = [
-  handleGetBooks(({ request }) => {
+  handleGetBooks(async ({ request }) => {
     const query = new URL(request.url).searchParams
+    const search = (await request.json().catch(() => ({}))) as BookSearch
+    // full text search: every other book matches on its content
+    const books = search.fullTextSearch
+      ? mockBooks(30).map((book, index) =>
+          index % 2 === 0
+            ? {
+                ...book,
+                contentSnippets: [
+                  `disguise had completely fooled the Earthmen; they didn&#39;t even suspect that a <mark>Valdorian</mark> spy was among the engineers`,
+                  `&quot;Yes. She&#39;s a real beauty,&quot; the <mark>Valdorian</mark> said`,
+                ],
+              }
+            : book,
+        )
+      : mockBooks(50)
     return response200OK(
       mockPage(
-        mockBooks(50),
+        books,
         new PageRequest(Number(query.get('page')), Number(query.get('size')), query.getAll('sort')),
       ),
     )

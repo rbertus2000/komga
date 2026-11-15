@@ -351,6 +351,10 @@
     "defaultMessage": "On deck — {number}",
     "description": "Series view: book on deck"
   },
+  "4jihJ/": {
+    "defaultMessage": "Search by title, ISBN, or the text inside EPUB books",
+    "description": "Search page: empty state text when there is no search term"
+  },
   "4uqafX": {
     "defaultMessage": "One-shot",
     "description": "Filter: one-shot"
@@ -534,6 +538,10 @@
   "8kylzj": {
     "defaultMessage": "Delete",
     "description": "Multiple entities deletion dialog: confirm button"
+  },
+  "8mG82T": {
+    "defaultMessage": "Search books",
+    "description": "Search page: empty state title when there is no search term"
   },
   "8xonXJ": {
     "defaultMessage": "Analyzes all the media files in the library. The analysis captures information about the media. Depending on your library size, this may take a long time.",
@@ -1250,6 +1258,10 @@
   "NhIart": {
     "defaultMessage": "Delete book files",
     "description": "Book delete dialog: title"
+  },
+  "Nnjb9F": {
+    "defaultMessage": "Search books",
+    "description": "App bar: search field placeholder"
   },
   "No9Upl": {
     "defaultMessage": "Title",
@@ -2194,6 +2206,10 @@
   "cWVIRm": {
     "defaultMessage": "User Agent",
     "description": "Authentication Activity table header: User Agent"
+  },
+  "cZsR/O": {
+    "defaultMessage": "Index book content",
+    "description": "Task name: IndexBookContent"
   },
   "ccAMWS": {
     "defaultMessage": "Documentation",

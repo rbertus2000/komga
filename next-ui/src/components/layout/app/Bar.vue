@@ -45,6 +45,21 @@
       Komga
     </v-app-bar-title>
 
+    <v-text-field
+      v-model="search"
+      :placeholder="searchMessage"
+      :aria-label="searchMessage"
+      prepend-inner-icon="i-mdi:magnify"
+      variant="outlined"
+      density="compact"
+      max-width="480"
+      class="mx-2"
+      hide-details
+      single-line
+      clearable
+      @keydown.enter="router.push({ name: '/search', query: { q: search ?? '' } })"
+    />
+
     <template #append>
       <div class="d-flex align-center ga-2 pe-2">
         <TaskIndicator />
@@ -59,12 +74,25 @@ import { useAppStore } from '@/stores/app'
 import { useAnnouncements } from '@/colada/announcements'
 import { useIntl } from 'vue-intl'
 import { useDisplay } from 'vuetify'
+import { useRouteQuery } from '@vueuse/router'
 
 const intl = useIntl()
 const display = useDisplay()
 
 const appStore = useAppStore()
 const { unreadCount } = useAnnouncements()
+
+const router = useRouter()
+// keeps the field in sync with the search page
+const routeSearch = useRouteQuery('q', '')
+const search = ref<string | null>(routeSearch.value)
+watch(routeSearch, (it) => (search.value = it))
+
+const searchMessage = intl.formatMessage({
+  description: 'App bar: search field placeholder',
+  defaultMessage: 'Search books',
+  id: 'Nnjb9F',
+})
 
 const expandMessage = intl.formatMessage({
   description: 'Sidebar button: tooltip expand',

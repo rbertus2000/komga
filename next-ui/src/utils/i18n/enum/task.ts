@@ -56,6 +56,11 @@ export const taskNameMessage: Record<string, MessageDescriptor> = {
     defaultMessage: 'Hash book file (Koreader)',
     id: 'Z42XVQ',
   }),
+  IndexBookContent: defineMessage({
+    description: 'Task name: IndexBookContent',
+    defaultMessage: 'Index book content',
+    id: 'cZsR/O',
+  }),
   RefreshSeriesMetadata: defineMessage({
     description: 'Task name: RefreshSeriesMetadata',
     defaultMessage: 'Refresh series metadata',
