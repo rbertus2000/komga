@@ -82,6 +82,17 @@ class EpubExtractor(
       }
     }
 
+  /**
+   * Extracts the text of the documents in the reading order
+   */
+  fun getText(path: Path): String =
+    path.epub { epub ->
+      getResources(epub)
+        .filter { it.subType == MediaFile.SubType.EPUB_PAGE && it.mediaType?.contains("html", true) == true }
+        .mapNotNull { page -> epub.zip.getEntryInputStream(page.fileName)?.use { Jsoup.parse(it, null, "").body().text() } }
+        .joinToString("\n")
+    }
+
   fun getResources(epub: EpubPackage): List<MediaFile> {
     val spine =
       epub.opfDoc

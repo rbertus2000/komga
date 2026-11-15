@@ -1,6 +1,7 @@
 package org.gotson.komga.infrastructure.search
 
 import org.apache.lucene.analysis.Analyzer
+import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper
 import org.apache.lucene.index.IndexWriter
 import org.apache.lucene.index.IndexWriterConfig
 import org.apache.lucene.search.SearcherFactory
@@ -20,9 +21,13 @@ class LuceneConfiguration(
   private val komgaProperties: KomgaProperties,
 ) {
   @Bean
-  fun indexAnalyzer() =
+  fun indexAnalyzer(): Analyzer =
     with(komgaProperties.lucene.indexAnalyzer) {
-      MultiLingualNGramAnalyzer(minGram, maxGram, preserveOriginal)
+      // no n-grams for the book content, the index would be many times the size of the text
+      PerFieldAnalyzerWrapper(
+        MultiLingualNGramAnalyzer(minGram, maxGram, preserveOriginal),
+        LuceneEntity.BookContent.defaultFields.associateWith { MultiLingualAnalyzer() },
+      )
     }
 
   @Bean

@@ -93,6 +93,7 @@ dependencies {
   implementation("org.apache.lucene:lucene-core:${libs.versions.lucene.get()}")
   implementation("org.apache.lucene:lucene-analysis-common:${libs.versions.lucene.get()}")
   implementation("org.apache.lucene:lucene-queryparser:${libs.versions.lucene.get()}")
+  implementation("org.apache.lucene:lucene-highlighter:${libs.versions.lucene.get()}")
   implementation("org.apache.lucene:lucene-backward-codecs:${libs.versions.lucene.get()}")
 
   implementation("com.ibm.icu:icu4j:79.1")

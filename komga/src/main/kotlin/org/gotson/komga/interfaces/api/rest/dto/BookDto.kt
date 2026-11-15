@@ -1,7 +1,9 @@
 package org.gotson.komga.interfaces.api.rest.dto
 
 import com.fasterxml.jackson.annotation.JsonFormat
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.jakewharton.byteunits.BinaryByteUnit
+import io.swagger.v3.oas.annotations.media.Schema
 import org.apache.commons.io.FilenameUtils
 import org.gotson.komga.domain.model.MediaType
 import java.time.LocalDate
@@ -29,6 +31,9 @@ data class BookDto(
   val deleted: Boolean,
   val fileHash: String,
   val oneshot: Boolean,
+  @get:Schema(description = "Excerpts of the book content matching the full text search. HTML-escaped, with the matching terms enclosed in <mark> tags. Only present for paged full text searches matching the book content.")
+  @get:JsonInclude(JsonInclude.Include.NON_NULL)
+  val contentSnippets: List<String>? = null,
 )
 
 fun BookDto.restrictUrl(restrict: Boolean) = if (restrict) copy(url = FilenameUtils.getName(url)) else this

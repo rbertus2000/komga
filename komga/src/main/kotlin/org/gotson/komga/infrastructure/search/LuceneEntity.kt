@@ -3,8 +3,10 @@ package org.gotson.komga.infrastructure.search
 import org.apache.lucene.document.DateTools
 import org.apache.lucene.document.Document
 import org.apache.lucene.document.Field
+import org.apache.lucene.document.FieldType
 import org.apache.lucene.document.StringField
 import org.apache.lucene.document.TextField
+import org.apache.lucene.index.IndexOptions
 import org.gotson.komga.domain.model.ReadList
 import org.gotson.komga.domain.model.SeriesCollection
 import org.gotson.komga.interfaces.api.rest.dto.BookDto
@@ -20,6 +22,9 @@ enum class LuceneEntity(
   Series("series", "series_id", arrayOf("title")),
   Collection("collection", "collection_id", arrayOf("name")),
   ReadList("readlist", "readlist_id", arrayOf("name")),
+
+  // text of the book file, kept in its own document so that it does not need to be extracted again when the book metadata changes
+  BookContent("book_content", "book_content_id", arrayOf("content")),
   ;
 
   companion object {
@@ -46,6 +51,23 @@ fun BookDto.toDocument() =
     add(StringField(LuceneEntity.TYPE, LuceneEntity.Book.type, Field.Store.NO))
     add(StringField(LuceneEntity.Book.id, id, Field.Store.YES))
   }
+
+// stored and indexed with offsets, so that excerpts can be highlighted without analyzing the whole text again
+private val contentFieldType =
+  FieldType(TextField.TYPE_STORED).apply {
+    setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS)
+    freeze()
+  }
+
+fun bookContentDocument(
+  bookId: String,
+  content: String,
+) = Document().apply {
+  // the ID must be the first stored field, so it can be read without loading the content
+  add(StringField(LuceneEntity.BookContent.id, bookId, Field.Store.YES))
+  add(StringField(LuceneEntity.TYPE, LuceneEntity.BookContent.type, Field.Store.NO))
+  add(Field(LuceneEntity.BookContent.defaultFields.first(), content, contentFieldType))
+}
 
 fun SeriesDto.toDocument() =
   Document().apply {

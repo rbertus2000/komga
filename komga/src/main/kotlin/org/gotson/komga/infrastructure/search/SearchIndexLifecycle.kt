@@ -3,12 +3,14 @@ package org.gotson.komga.infrastructure.search
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.apache.lucene.document.Document
 import org.apache.lucene.index.Term
+import org.gotson.komga.domain.model.Book
 import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.ReadList
 import org.gotson.komga.domain.model.SearchContext
 import org.gotson.komga.domain.model.SeriesCollection
 import org.gotson.komga.domain.persistence.ReadListRepository
 import org.gotson.komga.domain.persistence.SeriesCollectionRepository
+import org.gotson.komga.infrastructure.mediacontainer.epub.EpubExtractor
 import org.gotson.komga.interfaces.api.persistence.BookDtoRepository
 import org.gotson.komga.interfaces.api.persistence.SeriesDtoRepository
 import org.gotson.komga.interfaces.api.rest.dto.BookDto
@@ -22,7 +24,7 @@ import kotlin.math.ceil
 import kotlin.time.measureTime
 
 private val logger = KotlinLogging.logger {}
-private const val INDEX_VERSION = 8
+private const val INDEX_VERSION = 9
 
 @Component
 class SearchIndexLifecycle(
@@ -31,7 +33,12 @@ class SearchIndexLifecycle(
   private val bookDtoRepository: BookDtoRepository,
   private val seriesDtoRepository: SeriesDtoRepository,
   private val luceneHelper: LuceneHelper,
+  private val epubExtractor: EpubExtractor,
 ) {
+  fun indexBookContent(book: Book) {
+    luceneHelper.updateDocument(Term(LuceneEntity.BookContent.id, book.id), bookContentDocument(book.id, epubExtractor.getText(book.path)))
+  }
+
   fun upgradeIndex() {
     luceneHelper.upgradeIndex()
     luceneHelper.setIndexVersion(INDEX_VERSION)
@@ -48,6 +55,8 @@ class SearchIndexLifecycle(
         LuceneEntity.Series -> rebuildIndex(it, { p: Pageable -> seriesDtoRepository.findAll(p) }, { e: SeriesDto -> e.toDocument() })
         LuceneEntity.Collection -> rebuildIndex(it, { p: Pageable -> collectionRepository.findAll(SearchContext.empty(), p) }, { e: SeriesCollection -> e.toDocument() })
         LuceneEntity.ReadList -> rebuildIndex(it, { p: Pageable -> readListRepository.findAll(SearchContext.empty(), p) }, { e: ReadList -> e.toDocument() })
+        // extracted from the book files, which is slow: the TaskHandler submits 1 task per book instead
+        LuceneEntity.BookContent -> Unit
       }
     }
 
@@ -91,7 +100,10 @@ class SearchIndexLifecycle(
 
       is DomainEvent.BookAdded -> bookDtoRepository.findByIdOrNull(event.book.id, "unused")?.bookToDocument()?.let { addEntity(it) }
       is DomainEvent.BookUpdated -> bookDtoRepository.findByIdOrNull(event.book.id, "unused")?.bookToDocument()?.let { updateEntity(LuceneEntity.Book, event.book.id, it) }
-      is DomainEvent.BookDeleted -> deleteEntity(LuceneEntity.Book, event.book.id)
+      is DomainEvent.BookDeleted -> {
+        deleteEntity(LuceneEntity.Book, event.book.id)
+        deleteEntity(LuceneEntity.BookContent, event.book.id)
+      }
 
       is DomainEvent.ReadListAdded -> readListRepository.findByIdOrNull(event.readList.id, SearchContext.empty())?.toDocument()?.let { addEntity(it) }
       is DomainEvent.ReadListUpdated -> readListRepository.findByIdOrNull(event.readList.id, SearchContext.empty())?.toDocument()?.let { updateEntity(LuceneEntity.ReadList, event.readList.id, it) }

@@ -101,7 +101,10 @@ class BookLifecycle(
 
     eventPublisher.publishEvent(DomainEvent.BookUpdated(book))
 
-    return if (media.status == Media.Status.READY) setOf(BookAction.GENERATE_THUMBNAIL, BookAction.REFRESH_METADATA) else emptySet()
+    return if (media.status == Media.Status.READY)
+      setOfNotNull(BookAction.GENERATE_THUMBNAIL, BookAction.REFRESH_METADATA, BookAction.INDEX_CONTENT.takeIf { media.profile == MediaProfile.EPUB })
+    else
+      emptySet()
   }
 
   fun hashAndPersist(book: Book) {

@@ -16,6 +16,7 @@ import org.gotson.komga.domain.service.LocalArtworkLifecycle
 import org.gotson.komga.domain.service.PageHashLifecycle
 import org.gotson.komga.domain.service.SeriesLifecycle
 import org.gotson.komga.domain.service.SeriesMetadataLifecycle
+import org.gotson.komga.infrastructure.search.LuceneEntity
 import org.gotson.komga.infrastructure.search.SearchIndexLifecycle
 import org.gotson.komga.interfaces.scheduler.METER_TASKS_EXECUTION
 import org.gotson.komga.interfaces.scheduler.METER_TASKS_FAILURE
@@ -87,6 +88,12 @@ class TaskHandler(
               val actions = bookLifecycle.analyzeAndPersist(book)
               if (actions.contains(BookAction.GENERATE_THUMBNAIL)) taskEmitter.generateBookThumbnail(book.id, priority = task.priority + 1)
               if (actions.contains(BookAction.REFRESH_METADATA)) taskEmitter.refreshBookMetadata(book, priority = task.priority + 1)
+              if (actions.contains(BookAction.INDEX_CONTENT)) taskEmitter.indexBookContent(book.id, LOWEST_PRIORITY)
+            } ?: logger.warn { "Cannot execute task $task: Book does not exist" }
+
+          is Task.IndexBookContent ->
+            bookRepository.findByIdOrNull(task.bookId)?.let { book ->
+              searchIndexLifecycle.indexBookContent(book)
             } ?: logger.warn { "Cannot execute task $task: Book does not exist" }
 
           is Task.GenerateBookThumbnail ->
@@ -159,7 +166,10 @@ class TaskHandler(
               bookLifecycle.hashPagesAndPersist(book)
             } ?: logger.warn { "Cannot execute task $task: Book does not exist" }
 
-          is Task.RebuildIndex -> searchIndexLifecycle.rebuildIndex(task.entities)
+          is Task.RebuildIndex -> {
+            searchIndexLifecycle.rebuildIndex(task.entities)
+            if (task.entities?.contains(LuceneEntity.BookContent) != false) taskEmitter.indexAllBooksContent(LOWEST_PRIORITY)
+          }
 
           is Task.UpgradeIndex -> searchIndexLifecycle.upgradeIndex()
 

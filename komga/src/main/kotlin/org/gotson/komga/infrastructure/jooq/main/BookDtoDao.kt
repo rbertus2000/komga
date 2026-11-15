@@ -17,7 +17,6 @@ import org.gotson.komga.infrastructure.jooq.toCondition
 import org.gotson.komga.infrastructure.jooq.toOrderBy
 import org.gotson.komga.infrastructure.jooq.toSortField
 import org.gotson.komga.infrastructure.jooq.unicode3
-import org.gotson.komga.infrastructure.search.LuceneEntity
 import org.gotson.komga.infrastructure.search.LuceneHelper
 import org.gotson.komga.infrastructure.web.toFilePath
 import org.gotson.komga.interfaces.api.persistence.BookDtoRepository
@@ -123,7 +122,7 @@ class BookDtoDao(
     searchTerm: String?,
     joins: Set<RequiredJoin>,
   ): Page<BookDto> {
-    val bookIds = luceneHelper.searchEntitiesIds(searchTerm, LuceneEntity.Book)
+    val bookIds = luceneHelper.searchBookIds(searchTerm)
 
     val orderBy =
       pageable.sort.mapNotNull {
@@ -159,6 +158,11 @@ class BookDtoDao(
             .orderBy(orderBy)
             .apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
             .fetchAndMap(dsl)
+            .let { books ->
+              // only for paged requests, as highlighting loads the whole text of each book
+              val snippets = if (pageable.isPaged) luceneHelper.highlightBookContent(searchTerm, books.map { it.id }) else emptyMap()
+              if (snippets.isEmpty()) books else books.map { it.copy(contentSnippets = snippets[it.id]) }
+            }
 
       val count =
         if (pageable.isUnpaged)

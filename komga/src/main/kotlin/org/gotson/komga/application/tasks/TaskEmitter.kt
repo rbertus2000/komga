@@ -8,6 +8,7 @@ import org.gotson.komga.domain.model.BookPageNumbered
 import org.gotson.komga.domain.model.CopyMode
 import org.gotson.komga.domain.model.Library
 import org.gotson.komga.domain.model.Media
+import org.gotson.komga.domain.model.MediaProfile
 import org.gotson.komga.domain.model.SearchCondition
 import org.gotson.komga.domain.model.SearchContext
 import org.gotson.komga.domain.model.SearchOperator
@@ -15,6 +16,7 @@ import org.gotson.komga.domain.persistence.BookRepository
 import org.gotson.komga.domain.service.BookConverter
 import org.gotson.komga.infrastructure.search.LuceneEntity
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 
@@ -189,6 +191,27 @@ class TaskEmitter(
   ) {
     books
       .map { Task.RefreshBookMetadata(it.id, capabilities, priority, it.seriesId) }
+      .let { submitTasks(it) }
+  }
+
+  fun indexBookContent(
+    bookId: String,
+    priority: Int = DEFAULT_PRIORITY,
+  ) {
+    submitTask(Task.IndexBookContent(bookId, priority))
+  }
+
+  fun indexAllBooksContent(priority: Int = DEFAULT_PRIORITY) {
+    bookRepository
+      .findAll(
+        SearchCondition.AllOfBook(
+          SearchCondition.MediaProfile(SearchOperator.Is(MediaProfile.EPUB)),
+          SearchCondition.MediaStatus(SearchOperator.Is(Media.Status.READY)),
+        ),
+        SearchContext.empty(),
+        Pageable.unpaged(),
+      ).content
+      .map { Task.IndexBookContent(it.id, priority) }
       .let { submitTasks(it) }
   }
 
